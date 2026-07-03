@@ -7,20 +7,42 @@ import ViewModal from './components/ViewModal'
 import FormModal from './components/FormModal'
 import ImportModal from './components/ImportModal'
 
+const SORT_OPTIONS = [
+  { value: 'newest',     label: '🕒 Newest first' },
+  { value: 'oldest',     label: '🕰 Oldest first' },
+  { value: 'az',         label: '🔤 A → Z' },
+  { value: 'za',         label: '🔤 Z → A' },
+  { value: 'time_asc',   label: '⏱ Cook time (short first)' },
+  { value: 'time_desc',  label: '⏱ Cook time (long first)' },
+  { value: 'difficulty', label: '⚡ Difficulty (easy first)' },
+]
+
+const DIFFICULTY_RANK = { Easy: 1, Medium: 2, Advanced: 3 }
+
+// Parse cook time strings like "30 min", "1 hr", "1 hr 30 min", "14 hrs" → minutes
+function parseTime(str) {
+  if (!str) return Infinity
+  const h = str.match(/(\d+)\s*hr/i)?.[1] || 0
+  const m = str.match(/(\d+)\s*min/i)?.[1] || 0
+  const total = parseInt(h) * 60 + parseInt(m)
+  return total > 0 ? total : Infinity
+}
+
 export default function App() {
   const { recipes, loading, error, addRecipe, updateRecipe, deleteRecipe } = useRecipes()
   const [filter, setFilter] = useState({ type: 'all' })
   const [search, setSearch] = useState('')
+  const [sort, setSort] = useState('newest')
   const [sidebarOpen, setSidebarOpen] = useState(true)
-  const [modal, setModal] = useState(null) // null | {mode:'view',id} | {mode:'form',id?}
+  const [modal, setModal] = useState(null)
   const [saving, setSaving] = useState(false)
   const [saveError, setSaveError] = useState(null)
   const [showImport, setShowImport] = useState(false)
   const [importDefaults, setImportDefaults] = useState(null)
 
-  // ── Filtering ──────────────────────────────────────────────────────────────
+  // ── Filter + Sort ──────────────────────────────────────────────────────────
   function getFiltered() {
-    return recipes.filter(r => {
+    const filtered = recipes.filter(r => {
       const matchCat =
         filter.type === 'all' ? true :
         filter.type === 'cat' ? r.category === filter.catId :
@@ -36,9 +58,23 @@ export default function App() {
 
       return matchCat && matchSearch
     })
+
+    return [...filtered].sort((a, b) => {
+      switch (sort) {
+        case 'newest':     return (b.created_at || 0) > (a.created_at || 0) ? 1 : -1
+        case 'oldest':     return (a.created_at || 0) > (b.created_at || 0) ? 1 : -1
+        case 'az':         return a.title.localeCompare(b.title)
+        case 'za':         return b.title.localeCompare(a.title)
+        case 'time_asc':   return parseTime(a.time) - parseTime(b.time)
+        case 'time_desc':  return parseTime(b.time) - parseTime(a.time)
+        case 'difficulty':
+          return (DIFFICULTY_RANK[a.difficulty] || 99) - (DIFFICULTY_RANK[b.difficulty] || 99)
+        default:           return 0
+      }
+    })
   }
 
-  // ── Save handler (add or update) ──────────────────────────────────────────
+  // ── Save handler ───────────────────────────────────────────────────────────
   async function handleSave(formData) {
     setSaving(true)
     setSaveError(null)
@@ -57,7 +93,7 @@ export default function App() {
     }
   }
 
-  // ── Delete handler ────────────────────────────────────────────────────────
+  // ── Delete handler ─────────────────────────────────────────────────────────
   async function handleDelete(id) {
     try {
       await deleteRecipe(id)
@@ -67,7 +103,7 @@ export default function App() {
     }
   }
 
-  // ── Import handler ────────────────────────────────────────────────────────
+  // ── Import handler ─────────────────────────────────────────────────────────
   function handleImported(data) {
     setImportDefaults({
       title:        data.title        || '',
@@ -123,6 +159,22 @@ export default function App() {
               {filtered.length} recipe{filtered.length !== 1 ? 's' : ''}
             </span>
           )}
+
+          {/* Sort dropdown */}
+          <select
+            value={sort}
+            onChange={e => setSort(e.target.value)}
+            style={{
+              padding: '7px 10px', borderRadius: 8, border: '1px solid #E5E0D8',
+              background: '#FFFFFF', color: '#44403C', fontSize: 13,
+              cursor: 'pointer', fontFamily: 'inherit',
+            }}
+          >
+            {SORT_OPTIONS.map(o => (
+              <option key={o.value} value={o.value}>{o.label}</option>
+            ))}
+          </select>
+
           <button onClick={() => setShowImport(true)} style={ghostBtn}>
             🔗 Import from URL
           </button>
