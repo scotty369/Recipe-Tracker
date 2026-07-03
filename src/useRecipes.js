@@ -12,6 +12,7 @@ export function useRecipes() {
     const { data, error } = await supabase
       .from('recipes')
       .select('*')
+      .is('deleted_at', null)
       .order('created_at', { ascending: false })
 
     if (error) {
@@ -49,10 +50,13 @@ export function useRecipes() {
     return data
   }
 
+  // Soft delete — marks the row with a timestamp instead of removing it.
+  // To recover a deleted recipe: Supabase dashboard → Table Editor → recipes
+  // → filter where deleted_at is not null → set deleted_at back to null.
   async function deleteRecipe(id) {
     const { error } = await supabase
       .from('recipes')
-      .delete()
+      .update({ deleted_at: new Date().toISOString() })
       .eq('id', id)
 
     if (error) throw new Error(error.message)
