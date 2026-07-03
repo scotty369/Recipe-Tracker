@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useRecipes } from './useRecipes'
 import { getCatIcon, getCatLabel } from './constants'
 import Sidebar from './components/Sidebar'
@@ -18,14 +18,23 @@ const SORT_OPTIONS = [
 ]
 
 const DIFFICULTY_RANK = { Easy: 1, Medium: 2, Advanced: 3 }
+const MAX_RECENT = 5
+const RECENT_KEY = 'recipetracker_recent'
 
-// Parse cook time strings like "30 min", "1 hr", "1 hr 30 min", "14 hrs" → minutes
 function parseTime(str) {
   if (!str) return Infinity
   const h = str.match(/(\d+)\s*hr/i)?.[1] || 0
   const m = str.match(/(\d+)\s*min/i)?.[1] || 0
   const total = parseInt(h) * 60 + parseInt(m)
   return total > 0 ? total : Infinity
+}
+
+function loadRecentIds() {
+  try { return JSON.parse(localStorage.getItem(RECENT_KEY)) || [] } catch { return [] }
+}
+
+function saveRecentIds(ids) {
+  try { localStorage.setItem(RECENT_KEY, JSON.stringify(ids)) } catch {}
 }
 
 export default function App() {
@@ -39,6 +48,26 @@ export default function App() {
   const [saveError, setSaveError] = useState(null)
   const [showImport, setShowImport] = useState(false)
   const [importDefaults, setImportDefaults] = useState(null)
+  const [recentIds, setRecentIds] = useState(loadRecentIds)
+
+  // Keep recentIds in sync with localStorage
+  useEffect(() => { saveRecentIds(recentIds) }, [recentIds])
+
+  // Remove any IDs from recents that no longer exist (e.g. deleted recipes)
+  useEffect(() => {
+    if (!recipes.length) return
+    const validIds = new Set(recipes.map(r => r.id))
+    setRecentIds(prev => prev.filter(id => validIds.has(id)))
+  }, [recipes])
+
+  // ── Track recipe views ─────────────────────────────────────────────────────
+  function openRecipe(id) {
+    setRecentIds(prev => {
+      const without = prev.filter(x => x !== id)
+      return [id, ...without].slice(0, MAX_RECENT)
+    })
+    setModal({ mode: 'view', id })
+  }
 
   // ── Filter + Sort ──────────────────────────────────────────────────────────
   function getFiltered() {
@@ -97,6 +126,7 @@ export default function App() {
   async function handleDelete(id) {
     try {
       await deleteRecipe(id)
+      setRecentIds(prev => prev.filter(x => x !== id))
       setModal(null)
     } catch (e) {
       alert('Failed to delete: ' + e.message)
@@ -123,6 +153,10 @@ export default function App() {
   }
 
   const filtered = getFiltered()
+  const recentRecipes = recentIds
+    .map(id => recipes.find(r => r.id === id))
+    .filter(Boolean)
+
   const activeTitle =
     filter.type === 'all' ? 'All Recipes' :
     filter.type === 'cat' ? `${getCatIcon(filter.catId)} ${getCatLabel(filter.catId)}` :
@@ -137,8 +171,10 @@ export default function App() {
       {sidebarOpen && (
         <Sidebar
           recipes={recipes}
+          recentRecipes={recentRecipes}
           filter={filter} setFilter={setFilter}
           search={search} setSearch={setSearch}
+          onOpenRecipe={openRecipe}
         />
       )}
 
@@ -227,7 +263,7 @@ export default function App() {
               gap: 14,
             }}>
               {filtered.map(r => (
-                <RecipeCard key={r.id} recipe={r} onClick={() => setModal({ mode: 'view', id: r.id })} />
+                <RecipeCard key={r.id} recipe={r} onClick={() => openRecipe(r.id)} />
               ))}
             </div>
           )}

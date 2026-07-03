@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { CATEGORIES, getCatIcon, getCatLabel } from '../constants'
 
-export default function Sidebar({ recipes, filter, setFilter, search, setSearch }) {
+export default function Sidebar({ recipes, recentRecipes, filter, setFilter, search, setSearch, onOpenRecipe }) {
   const [openCats, setOpenCats] = useState({})
 
   function countFor(catId, sub) {
@@ -46,11 +46,53 @@ export default function Sidebar({ recipes, filter, setFilter, search, setSearch 
 
       {/* Nav */}
       <nav style={{ flex: 1, overflowY: 'auto', padding: '4px 0 12px' }}>
+
+        {/* Recently Viewed */}
+        {recentRecipes.length > 0 && (
+          <div style={{ marginBottom: 6 }}>
+            <p style={{
+              fontSize: 10, fontWeight: 700, textTransform: 'uppercase',
+              letterSpacing: '0.08em', color: '#A8A29E',
+              padding: '8px 12px 4px', margin: 0,
+            }}>
+              Recently Viewed
+            </p>
+            {recentRecipes.map(r => (
+              <button
+                key={r.id}
+                onClick={() => onOpenRecipe(r.id)}
+                style={{
+                  display: 'flex', alignItems: 'center', gap: 8,
+                  width: '100%', border: 'none', cursor: 'pointer',
+                  padding: '5px 12px', fontSize: 13, textAlign: 'left',
+                  background: 'transparent', color: '#44403C',
+                  overflow: 'hidden',
+                }}
+                onMouseEnter={e => e.currentTarget.style.background = '#F9F6F0'}
+                onMouseLeave={e => e.currentTarget.style.background = 'transparent'}
+              >
+                <span style={{ fontSize: 16, flexShrink: 0 }}>{r.emoji || '📄'}</span>
+                <span style={{
+                  flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+                  fontSize: 13, color: '#44403C',
+                }}>{r.title}</span>
+                <span style={{ fontSize: 11, color: '#A8A29E', flexShrink: 0 }}>
+                  {getCatIcon(r.category)}
+                </span>
+              </button>
+            ))}
+            <div style={{ margin: '6px 12px 2px', borderBottom: '1px solid #E5E0D8' }} />
+          </div>
+        )}
+
+        {/* All Recipes */}
         <NavItem
           icon="📋" label="All Recipes" count={countFor()}
           active={filter.type === 'all'}
           onClick={() => setFilter({ type: 'all' })}
         />
+
+        {/* Categories */}
         {CATEGORIES.map(cat => (
           <CatGroup
             key={cat.id} cat={cat}
