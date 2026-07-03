@@ -5,6 +5,7 @@ import Sidebar from './components/Sidebar'
 import RecipeCard from './components/RecipeCard'
 import ViewModal from './components/ViewModal'
 import FormModal from './components/FormModal'
+import ImportModal from './components/ImportModal'
 
 export default function App() {
   const { recipes, loading, error, addRecipe, updateRecipe, deleteRecipe } = useRecipes()
@@ -14,6 +15,8 @@ export default function App() {
   const [modal, setModal] = useState(null) // null | {mode:'view',id} | {mode:'form',id?}
   const [saving, setSaving] = useState(false)
   const [saveError, setSaveError] = useState(null)
+  const [showImport, setShowImport] = useState(false)
+  const [importDefaults, setImportDefaults] = useState(null)
 
   // ── Filtering ──────────────────────────────────────────────────────────────
   function getFiltered() {
@@ -46,6 +49,7 @@ export default function App() {
         await addRecipe(formData)
       }
       setModal(null)
+      setImportDefaults(null)
     } catch (e) {
       setSaveError(e.message)
     } finally {
@@ -61,6 +65,25 @@ export default function App() {
     } catch (e) {
       alert('Failed to delete: ' + e.message)
     }
+  }
+
+  // ── Import handler ────────────────────────────────────────────────────────
+  function handleImported(data) {
+    setImportDefaults({
+      title:        data.title        || '',
+      emoji:        '📄',
+      category:     'dinner',
+      sub:          'Other Dinner',
+      servings:     data.servings     || '',
+      time:         data.time         || '',
+      difficulty:   'Medium',
+      ingredients:  data.ingredients?.length ? data.ingredients : [{ qty: '', name: '' }],
+      instructions: data.instructions || '',
+      notes:        data.notes        || '',
+      tags:         [],
+    })
+    setShowImport(false)
+    setModal({ mode: 'form' })
   }
 
   const filtered = getFiltered()
@@ -100,7 +123,10 @@ export default function App() {
               {filtered.length} recipe{filtered.length !== 1 ? 's' : ''}
             </span>
           )}
-          <button onClick={() => setModal({ mode: 'form' })} style={primaryBtn}>
+          <button onClick={() => setShowImport(true)} style={ghostBtn}>
+            🔗 Import from URL
+          </button>
+          <button onClick={() => { setImportDefaults(null); setModal({ mode: 'form' }) }} style={primaryBtn}>
             + Add Recipe
           </button>
         </header>
@@ -168,11 +194,18 @@ export default function App() {
 
       {modal?.mode === 'form' && (
         <FormModal
-          recipe={currentRecipe}
-          onClose={() => setModal(null)}
+          recipe={currentRecipe ?? importDefaults}
+          onClose={() => { setModal(null); setImportDefaults(null) }}
           onSave={handleSave}
           onDelete={currentRecipe ? () => handleDelete(currentRecipe.id) : null}
           saving={saving}
+        />
+      )}
+
+      {showImport && (
+        <ImportModal
+          onClose={() => setShowImport(false)}
+          onImported={handleImported}
         />
       )}
     </div>
